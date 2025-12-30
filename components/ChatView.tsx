@@ -24,8 +24,10 @@ const ChatView: React.FC<ChatViewProps> = ({ faqData, systemPrompt }) => {
   const [isLoading, setIsLoading] = useState(false);
   const chatContainerRef = useRef<HTMLDivElement>(null);
 
+  const [namePromptCount, setNamePromptCount] = useState(1);
+  const [isNameFlowComplete, setIsNameFlowComplete] = useState(false);
+
   useEffect(() => {
-    // This effect runs only once after the component mounts for the welcome sequence
     const timer = setTimeout(() => {
       setMessages((prev) => [
         ...prev,
@@ -35,10 +37,9 @@ const ChatView: React.FC<ChatViewProps> = ({ faqData, systemPrompt }) => {
           sender: 'bot',
         },
       ]);
-    }, 1000); // 1-second delay for a natural feel
-
+    }, 1000);
     return () => clearTimeout(timer);
-  }, []); // Empty dependency array ensures it runs only once
+  }, []);
 
   useEffect(() => {
     chatContainerRef.current?.scrollTo({
@@ -47,48 +48,10 @@ const ChatView: React.FC<ChatViewProps> = ({ faqData, systemPrompt }) => {
     });
   }, [messages]);
 
-  const handleSendMessage = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!input.trim() || isLoading) return;
-
-    const userMessage: Message = {
-      id: Date.now().toString(),
-      text: input,
-      sender: 'user',
-    };
-    setMessages((prev) => [...prev, userMessage]);
-    const currentInput = input;
-    setInput('');
-
-    if (!userName) {
-      const normalizedInput = currentInput.trim().toLowerCase();
-      const commonGreetings = ['hola', 'buenos dias', 'buenas tardes', 'buenas noches', 'hey', 'que tal'];
-
-      if (commonGreetings.includes(normalizedInput) || currentInput.length < 2) {
-          // It's likely a greeting, not a name. Reprompt.
-          const greetingResponse: Message = {
-              id: Date.now().toString() + '-reprompt',
-              text: '¡Hola! Para poder personalizar nuestra conversación, ¿podrías decirme tu nombre, por favor?',
-              sender: 'bot',
-          };
-          setMessages((prev) => [...prev, greetingResponse]);
-          return;
-      }
-
-      setUserName(currentInput);
-      const welcomeMessage: Message = {
-        id: Date.now().toString() + '-welcome',
-        text: `¡Genial, ${currentInput}! Un placer conocerte. Ahora sí, ¿en qué puedo ayudarte?`,
-        sender: 'bot',
-      };
-      setMessages((prev) => [...prev, welcomeMessage]);
-      return;
-    }
-
+  const processQuery = async (query: string) => {
     setIsLoading(true);
-
     const startTime = performance.now();
-    const faqMatch = await findBestFAQMatch(currentInput, faqData);
+    const faqMatch = await findBestFAQMatch(query, faqData);
 
     let botResponse: Message;
 
@@ -103,7 +66,7 @@ const ChatView: React.FC<ChatViewProps> = ({ faqData, systemPrompt }) => {
       };
       console.log(`Response source: LOCAL_FAQ, Latency: ${latency}ms`);
     } else {
-      const geminiText = await generateResponse(currentInput, systemPrompt, userName);
+      const geminiText = await generateResponse(query, systemPrompt, userName);
       const latency = Math.round(performance.now() - startTime);
       botResponse = {
         id: Date.now().toString() + '-gemini',
@@ -118,6 +81,61 @@ const ChatView: React.FC<ChatViewProps> = ({ faqData, systemPrompt }) => {
     setMessages((prev) => [...prev, botResponse]);
     setIsLoading(false);
   };
+  
+  const handleSendMessage = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!input.trim() || isLoading) return;
+
+    const userMessage: Message = {
+      id: Date.now().toString(),
+      text: input,
+      sender: 'user',
+    };
+    setMessages((prev) => [...prev, userMessage]);
+    const currentInput = input;
+    setInput('');
+
+    if (!isNameFlowComplete) {
+      const normalizedInput = currentInput.trim().toLowerCase();
+      const commonGreetings = ['hola', 'buenos dias', 'buenas tardes', 'buenas noches', 'hey', 'que tal'];
+      const isLikelyGreeting = commonGreetings.includes(normalizedInput) || currentInput.length < 2;
+
+      if (isLikelyGreeting && namePromptCount >= 2) {
+        setIsNameFlowComplete(true);
+        const giveUpMessage: Message = {
+            id: Date.now().toString() + '-giveup',
+            text: 'No te preocupes. Preguntaba tu nombre para darte una atención más personalizada. ¿En qué puedo ayudarte ahora?',
+            sender: 'bot',
+        };
+        setMessages((prev) => [...prev, giveUpMessage]);
+        await processQuery(currentInput);
+        return;
+      }
+
+      if (isLikelyGreeting) {
+          setNamePromptCount(prev => prev + 1);
+          const greetingResponse: Message = {
+              id: Date.now().toString() + '-reprompt',
+              text: '¡Hola! Para poder personalizar nuestra conversación, ¿podrías decirme tu nombre, por favor?',
+              sender: 'bot',
+          };
+          setMessages((prev) => [...prev, greetingResponse]);
+          return;
+      }
+
+      setUserName(currentInput);
+      setIsNameFlowComplete(true);
+      const welcomeMessage: Message = {
+        id: Date.now().toString() + '-welcome',
+        text: `¡Genial, ${currentInput}! Un placer conocerte. Ahora sí, ¿en qué puedo ayudarte?`,
+        sender: 'bot',
+      };
+      setMessages((prev) => [...prev, welcomeMessage]);
+      return;
+    }
+
+    await processQuery(currentInput);
+  };
 
   return (
     <div className="flex flex-col h-full bg-slate-900">
@@ -125,7 +143,7 @@ const ChatView: React.FC<ChatViewProps> = ({ faqData, systemPrompt }) => {
         {messages.map((msg) => (
           <div key={msg.id} className={`flex items-start gap-4 ${msg.sender === 'user' ? 'justify-end' : ''}`}>
             {msg.sender === 'bot' && (
-              <div className="flex-shrink-0 w-10 h-10 rounded-full bg-blue-500/20 flex items-center justify-center border-2 border-blue-500">
+              <div className="flex-shrink-0 w-10 h-10 rounded-lg bg-blue-600 flex items-center justify-center shadow-md">
                 <BotIcon />
               </div>
             )}
@@ -146,15 +164,15 @@ const ChatView: React.FC<ChatViewProps> = ({ faqData, systemPrompt }) => {
               )}
             </div>
              {msg.sender === 'user' && (
-              <div className="flex-shrink-0 w-10 h-10 rounded-full bg-slate-600 flex items-center justify-center">
-                <UserIcon />
+              <div className="flex-shrink-0 w-10 h-10 rounded-full bg-slate-500 flex items-center justify-center shadow-md">
+                <UserIcon initial={userName ? userName.charAt(0) : null} />
               </div>
             )}
           </div>
         ))}
         {isLoading && (
           <div className="flex items-start gap-4">
-             <div className="flex-shrink-0 w-10 h-10 rounded-full bg-blue-500/20 flex items-center justify-center border-2 border-blue-500">
+             <div className="flex-shrink-0 w-10 h-10 rounded-lg bg-blue-600 flex items-center justify-center shadow-md">
                 <BotIcon />
               </div>
             <div className="max-w-md rounded-xl px-4 py-3 shadow-md bg-slate-800 text-slate-300 rounded-bl-none">
@@ -173,7 +191,7 @@ const ChatView: React.FC<ChatViewProps> = ({ faqData, systemPrompt }) => {
             type="text"
             value={input}
             onChange={(e) => setInput(e.target.value)}
-            placeholder={!userName ? "Escribe tu nombre..." : "Escribe tu pregunta aquí..."}
+            placeholder={!isNameFlowComplete ? "Escribe tu nombre..." : "Escribe tu pregunta aquí..."}
             className="flex-1 w-full bg-slate-700 text-white rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 border-transparent placeholder-slate-400"
             aria-label="Chat input"
             disabled={isLoading}
