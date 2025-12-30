@@ -12,16 +12,22 @@ try {
 }
 
 
-export const generateResponse = async (prompt: string, systemInstruction: string): Promise<string> => {
+export const generateResponse = async (prompt: string, systemInstruction: string, userName: string | null): Promise<string> => {
     if (!ai) {
         return "El servicio de IA no está configurado correctamente. Falta la API Key.";
     }
+
+    let finalSystemInstruction = systemInstruction;
+    if (userName) {
+        finalSystemInstruction += `\n\nEl nombre del usuario es ${userName}. Dirígete a él por su nombre cuando sea apropiado y natural hacerlo en la conversación.`;
+    }
+
     try {
         const response = await ai.models.generateContent({
             model: 'gemini-3-flash-preview',
             contents: prompt,
             config: {
-                systemInstruction: systemInstruction,
+                systemInstruction: finalSystemInstruction,
                 temperature: 0.5,
             }
         });

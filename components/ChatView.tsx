@@ -12,16 +12,33 @@ interface ChatViewProps {
 }
 
 const ChatView: React.FC<ChatViewProps> = ({ faqData, systemPrompt }) => {
+  const [userName, setUserName] = useState<string | null>(null);
   const [messages, setMessages] = useState<Message[]>([
     {
-      id: 'initial',
-      text: '¡Hola! Soy BotNica, tu asistente virtual. ¿En qué puedo ayudarte hoy?',
+      id: 'initial-1',
+      text: '¡Hola! Soy BotNica, tu asistente virtual.',
       sender: 'bot',
     },
   ]);
   const [input, setInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const chatContainerRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    // This effect runs only once after the component mounts for the welcome sequence
+    const timer = setTimeout(() => {
+      setMessages((prev) => [
+        ...prev,
+        {
+          id: 'initial-2',
+          text: 'Para poder atenderte mejor, ¿cuál es tu nombre?',
+          sender: 'bot',
+        },
+      ]);
+    }, 1000); // 1-second delay for a natural feel
+
+    return () => clearTimeout(timer);
+  }, []); // Empty dependency array ensures it runs only once
 
   useEffect(() => {
     chatContainerRef.current?.scrollTo({
@@ -42,10 +59,35 @@ const ChatView: React.FC<ChatViewProps> = ({ faqData, systemPrompt }) => {
     setMessages((prev) => [...prev, userMessage]);
     const currentInput = input;
     setInput('');
+
+    if (!userName) {
+      const normalizedInput = currentInput.trim().toLowerCase();
+      const commonGreetings = ['hola', 'buenos dias', 'buenas tardes', 'buenas noches', 'hey', 'que tal'];
+
+      if (commonGreetings.includes(normalizedInput) || currentInput.length < 2) {
+          // It's likely a greeting, not a name. Reprompt.
+          const greetingResponse: Message = {
+              id: Date.now().toString() + '-reprompt',
+              text: '¡Hola! Para poder personalizar nuestra conversación, ¿podrías decirme tu nombre, por favor?',
+              sender: 'bot',
+          };
+          setMessages((prev) => [...prev, greetingResponse]);
+          return;
+      }
+
+      setUserName(currentInput);
+      const welcomeMessage: Message = {
+        id: Date.now().toString() + '-welcome',
+        text: `¡Genial, ${currentInput}! Un placer conocerte. Ahora sí, ¿en qué puedo ayudarte?`,
+        sender: 'bot',
+      };
+      setMessages((prev) => [...prev, welcomeMessage]);
+      return;
+    }
+
     setIsLoading(true);
 
     const startTime = performance.now();
-    // findBestFAQMatch is now async
     const faqMatch = await findBestFAQMatch(currentInput, faqData);
 
     let botResponse: Message;
@@ -61,7 +103,7 @@ const ChatView: React.FC<ChatViewProps> = ({ faqData, systemPrompt }) => {
       };
       console.log(`Response source: LOCAL_FAQ, Latency: ${latency}ms`);
     } else {
-      const geminiText = await generateResponse(currentInput, systemPrompt);
+      const geminiText = await generateResponse(currentInput, systemPrompt, userName);
       const latency = Math.round(performance.now() - startTime);
       botResponse = {
         id: Date.now().toString() + '-gemini',
@@ -131,7 +173,7 @@ const ChatView: React.FC<ChatViewProps> = ({ faqData, systemPrompt }) => {
             type="text"
             value={input}
             onChange={(e) => setInput(e.target.value)}
-            placeholder="Escribe tu pregunta aquí..."
+            placeholder={!userName ? "Escribe tu nombre..." : "Escribe tu pregunta aquí..."}
             className="flex-1 w-full bg-slate-700 text-white rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 border-transparent placeholder-slate-400"
             aria-label="Chat input"
             disabled={isLoading}
