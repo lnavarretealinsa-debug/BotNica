@@ -6,6 +6,7 @@ import { useLocalStorage } from './hooks/useLocalStorage';
 import { FAQItem } from './types';
 import { INITIAL_FAQ, DEFAULT_SYSTEM_PROMPT } from './constants';
 import { LockClosedIcon, ChatBubbleLeftRightIcon } from './components/icons/Icons';
+import { Toaster } from 'react-hot-toast';
 
 const App: React.FC = () => {
   const [view, setView] = useState<'chat' | 'admin'>('chat');
@@ -28,6 +29,17 @@ const App: React.FC = () => {
 
   return (
     <div className="flex flex-col h-screen bg-slate-900 font-sans">
+       <Toaster
+        position="top-center"
+        reverseOrder={false}
+        toastOptions={{
+          className: '',
+          style: {
+            background: '#334155', // slate-700
+            color: '#fff',
+          },
+        }}
+      />
       <header className="bg-slate-800/50 backdrop-blur-sm border-b border-slate-700 p-4 flex justify-between items-center shadow-lg">
         <h1 className="text-xl md:text-2xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-blue-400 to-teal-300">
           BotNica

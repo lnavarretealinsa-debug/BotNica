@@ -30,4 +30,4 @@ No inventes información. Si no sabes la respuesta a algo, indica amablemente qu
 
 export const FUZZY_SEARCH_THRESHOLD = 0.85;
 
-export const ADMIN_PASSWORD = "admin"; // In a real app, this would be handled securely.
+export const ADMIN_PASSWORD = "botnica@admin"; // In a real app, this would be handled securely.

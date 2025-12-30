@@ -4,6 +4,7 @@ import { FAQItem } from '../types';
 import { ADMIN_PASSWORD } from '../constants';
 import { PlusIcon, TrashIcon, PencilIcon, UploadIcon } from './icons/Icons';
 import * as XLSX from 'xlsx';
+import toast from 'react-hot-toast';
 
 interface AdminViewProps {
   faqData: FAQItem[];
@@ -39,10 +40,14 @@ const AdminView: React.FC<AdminViewProps> = ({ faqData, setFaqData, systemPrompt
   };
 
   const handleAddOrUpdateFaq = () => {
-    if (!newQuestion.trim() || !newAnswer.trim()) return;
+    if (!newQuestion.trim() || !newAnswer.trim()) {
+      toast.error('La pregunta y la respuesta no pueden estar vacías.');
+      return;
+    };
     
     if (editingFaq) {
       setFaqData(faqData.map(item => item.id === editingFaq.id ? { ...item, question: newQuestion, answer: newAnswer } : item));
+      toast.success('Pregunta actualizada con éxito.');
     } else {
       const newItem: FAQItem = {
         id: `faq-${Date.now()}`,
@@ -50,6 +55,7 @@ const AdminView: React.FC<AdminViewProps> = ({ faqData, setFaqData, systemPrompt
         answer: newAnswer,
       };
       setFaqData([...faqData, newItem]);
+      toast.success('Nueva pregunta añadida.');
     }
     resetForm();
   };
@@ -58,12 +64,35 @@ const AdminView: React.FC<AdminViewProps> = ({ faqData, setFaqData, systemPrompt
     setEditingFaq(item);
     setNewQuestion(item.question);
     setNewAnswer(item.answer);
+    window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
   const handleDelete = (id: string) => {
-    if (window.confirm('¿Estás seguro de que quieres eliminar esta pregunta?')) {
-      setFaqData(faqData.filter(item => item.id !== id));
-    }
+    toast((t) => (
+      <div className="flex flex-col gap-4">
+        <p>¿Estás seguro de que quieres eliminar esta pregunta?</p>
+        <div className="flex gap-2">
+          <button
+            onClick={() => {
+              setFaqData(faqData.filter(item => item.id !== id));
+              toast.dismiss(t.id);
+              toast.success('Pregunta eliminada.');
+            }}
+            className="w-full bg-red-600 text-white font-bold py-2 px-4 rounded-md hover:bg-red-500 transition-colors"
+          >
+            Eliminar
+          </button>
+          <button
+            onClick={() => toast.dismiss(t.id)}
+            className="w-full bg-slate-600 text-white font-bold py-2 px-4 rounded-md hover:bg-slate-500 transition-colors"
+          >
+            Cancelar
+          </button>
+        </div>
+      </div>
+    ), {
+      duration: 6000,
+    });
   };
   
   const resetForm = () => {
@@ -74,7 +103,7 @@ const AdminView: React.FC<AdminViewProps> = ({ faqData, setFaqData, systemPrompt
 
   const handlePromptSave = () => {
     setSystemPrompt(prompt);
-    alert('System prompt guardado!');
+    toast.success('System prompt guardado con éxito.');
   };
 
   const handleFileImport = (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -91,7 +120,7 @@ const AdminView: React.FC<AdminViewProps> = ({ faqData, setFaqData, systemPrompt
         const json: any[][] = XLSX.utils.sheet_to_json(worksheet, { header: 1 });
 
         const newFaqs: FAQItem[] = json
-          .filter(row => row[0] && row[1]) // Ensure both question and answer exist
+          .filter(row => row[0] && row[1]) 
           .map((row, index) => ({
             id: `faq-import-${Date.now()}-${index}`,
             question: String(row[0]),
@@ -99,18 +128,36 @@ const AdminView: React.FC<AdminViewProps> = ({ faqData, setFaqData, systemPrompt
           }));
 
         if (newFaqs.length > 0) {
-          if (window.confirm(`Se encontraron ${newFaqs.length} preguntas. ¿Deseas añadirlas a la lista actual?`)) {
-            setFaqData(prev => [...prev, ...newFaqs]);
-            alert('¡Importación exitosa!');
-          }
+           toast((t) => (
+              <div className="flex flex-col gap-4">
+                <p>{`Se encontraron ${newFaqs.length} preguntas. ¿Deseas añadirlas?`}</p>
+                <div className="flex gap-2">
+                  <button
+                    onClick={() => {
+                      setFaqData(prev => [...prev, ...newFaqs]);
+                      toast.dismiss(t.id);
+                      toast.success('¡Importación exitosa!');
+                    }}
+                    className="w-full bg-green-600 text-white font-bold py-2 px-4 rounded-md hover:bg-green-500 transition-colors"
+                  >
+                    Añadir
+                  </button>
+                  <button
+                    onClick={() => toast.dismiss(t.id)}
+                     className="w-full bg-slate-600 text-white font-bold py-2 px-4 rounded-md hover:bg-slate-500 transition-colors"
+                  >
+                    Cancelar
+                  </button>
+                </div>
+              </div>
+            ));
         } else {
-          alert('No se encontraron preguntas válidas en el archivo. Asegúrate de que el archivo tenga datos en las dos primeras columnas.');
+          toast.error('No se encontraron preguntas válidas en el archivo.');
         }
       } catch (err) {
         console.error("Error parsing Excel file:", err);
-        alert('Hubo un error al procesar el archivo Excel. Por favor, revisa el formato.');
+        toast.error('Error al procesar el archivo Excel.');
       } finally {
-        // Reset file input to allow re-uploading the same file
         if (fileInputRef.current) {
           fileInputRef.current.value = '';
         }
@@ -147,7 +194,6 @@ const AdminView: React.FC<AdminViewProps> = ({ faqData, setFaqData, systemPrompt
     <div className="h-full overflow-y-auto p-4 md:p-8 bg-slate-900 custom-scrollbar text-slate-200">
       <div className="max-w-4xl mx-auto">
         
-        {/* System Prompt Editor */}
         <section className="mb-12">
           <h2 className="text-2xl font-bold mb-4 text-transparent bg-clip-text bg-gradient-to-r from-blue-400 to-teal-300">Editor de System Prompt</h2>
           <div className="bg-slate-800 p-4 rounded-lg shadow-lg">
@@ -165,7 +211,6 @@ const AdminView: React.FC<AdminViewProps> = ({ faqData, setFaqData, systemPrompt
           </div>
         </section>
 
-        {/* FAQ Management */}
         <section>
           <div className="flex justify-between items-center mb-4">
             <h2 className="text-2xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-blue-400 to-teal-300">Gestionar Preguntas Frecuentes (FAQ)</h2>
@@ -186,7 +231,6 @@ const AdminView: React.FC<AdminViewProps> = ({ faqData, setFaqData, systemPrompt
             />
           </div>
 
-          {/* Add/Edit Form */}
           <div className="bg-slate-800 p-6 rounded-lg shadow-lg mb-8">
             <h3 className="text-xl font-semibold mb-4">{editingFaq ? 'Editar' : 'Añadir'} Pregunta</h3>
             <div className="space-y-4">
@@ -217,7 +261,6 @@ const AdminView: React.FC<AdminViewProps> = ({ faqData, setFaqData, systemPrompt
             </div>
           </div>
           
-          {/* FAQ List */}
           <div className="space-y-4">
             {faqData.map((item) => (
               <div key={item.id} className="bg-slate-800 p-4 rounded-lg shadow-md flex justify-between items-start">

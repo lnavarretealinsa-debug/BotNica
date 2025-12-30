@@ -40,11 +40,13 @@ const ChatView: React.FC<ChatViewProps> = ({ faqData, systemPrompt }) => {
       sender: 'user',
     };
     setMessages((prev) => [...prev, userMessage]);
+    const currentInput = input;
     setInput('');
     setIsLoading(true);
 
     const startTime = performance.now();
-    const faqMatch = findBestFAQMatch(input, faqData);
+    // findBestFAQMatch is now async
+    const faqMatch = await findBestFAQMatch(currentInput, faqData);
 
     let botResponse: Message;
 
@@ -52,14 +54,14 @@ const ChatView: React.FC<ChatViewProps> = ({ faqData, systemPrompt }) => {
       const latency = Math.round(performance.now() - startTime);
       botResponse = {
         id: Date.now().toString() + '-faq',
-        text: faqMatch.item.answer,
+        text: faqMatch.answer,
         sender: 'bot',
         source: 'LOCAL_FAQ',
         latency,
       };
       console.log(`Response source: LOCAL_FAQ, Latency: ${latency}ms`);
     } else {
-      const geminiText = await generateResponse(input, systemPrompt);
+      const geminiText = await generateResponse(currentInput, systemPrompt);
       const latency = Math.round(performance.now() - startTime);
       botResponse = {
         id: Date.now().toString() + '-gemini',
@@ -71,11 +73,8 @@ const ChatView: React.FC<ChatViewProps> = ({ faqData, systemPrompt }) => {
       console.log(`Response source: GEMINI_API, Latency: ${latency}ms`);
     }
     
-    // Simulate typing delay for better UX
-    setTimeout(() => {
-        setMessages((prev) => [...prev, botResponse]);
-        setIsLoading(false);
-    }, 500);
+    setMessages((prev) => [...prev, botResponse]);
+    setIsLoading(false);
   };
 
   return (
