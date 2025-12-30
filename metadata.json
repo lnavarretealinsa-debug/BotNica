@@ -1,0 +1,5 @@
+{
+  "name": "BotNica",
+  "description": "A hybrid user support chatbot that prioritizes local FAQ responses before consulting the Gemini API, featuring an admin panel for real-time content management.",
+  "requestFramePermissions": []
+}
